@@ -37,7 +37,10 @@
       color: #fff;
       padding: 1.5rem 0;
       text-align: center;
-      margin-top: 4rem;
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      left: 0;
     }
   </style>
 </head>
@@ -152,8 +155,7 @@
             <input type="tel" id="mobile" class="form-control w-50" placeholder="Mobile Number" required>
           </div>
           <div class="col-12">
-            <button type="button" id="editProfileBtn" class="btn btn-secondary me-2">Edit Profile</button>
-<button type="submit" class="btn btn-primary" id="saveProfileBtn" disabled>Save Profile</button>
+            <button type="submit" class="btn btn-primary" id="saveProfileBtn">Save Profile</button>
           </div>
         </div>
       </form>
@@ -273,34 +275,7 @@
   </div>
 </div>
 
-<!-- Ambulance Booking Section -->
-<div class="container mt-5">
-  <div class="card">
-    <div class="card-body">
-      <h4 class="mb-3">Book an Ambulance</h4>
-      <form id="ambulanceBookingForm">
-        <div class="mb-3">
-          <label for="ambulancePatientName" class="form-label">Patient Name</label>
-          <input type="text" class="form-control" id="ambulancePatientName" required />
-        </div>
-        <div class="mb-3">
-          <label for="pickupAddress" class="form-label">Pickup Address</label>
-          <textarea class="form-control" id="pickupAddress" rows="2" required></textarea>
-        </div>
-        <div class="mb-3">
-          <label for="ambulanceContact" class="form-label">Contact Number</label>
-          <input type="tel" class="form-control" id="ambulanceContact" required pattern="[0-9]{10,15}" />
-        </div>
-        <div class="mb-3">
-          <label for="bookingReason" class="form-label">Reason for Booking</label>
-          <input type="text" class="form-control" id="bookingReason" required />
-        </div>
-        <button type="submit" class="btn btn-danger">Book Ambulance</button>
-        <div id="ambulanceBookingMsg" class="mt-2"></div>
-      </form>
-    </div>
-  </div>
-</div>
+
 
 <!-- Receptionist Login -->
 <div id="receptionAuth" class="container mt-5 dashboard">
@@ -391,7 +366,34 @@
     </div>
   </div>
 </div>
-
+<!-- Ambulance Booking Section -->
+<div class="container mt-5">
+  <div class="card">
+    <div class="card-body">
+      <h4 class="mb-3">Book an Ambulance</h4>
+      <form id="ambulanceBookingForm">
+        <div class="mb-3">
+          <label for="ambulancePatientName" class="form-label">Patient Name</label>
+          <input type="text" class="form-control" id="ambulancePatientName" required />
+        </div>
+        <div class="mb-3">
+          <label for="pickupAddress" class="form-label">Pickup Address</label>
+          <textarea class="form-control" id="pickupAddress" rows="2" required></textarea>
+        </div>
+        <div class="mb-3">
+          <label for="ambulanceContact" class="form-label">Contact Number</label>
+          <input type="tel" class="form-control" id="ambulanceContact" required pattern="[0-9]{10,15}" />
+        </div>
+        <div class="mb-3">
+          <label for="bookingReason" class="form-label">Reason for Booking</label>
+          <input type="text" class="form-control" id="bookingReason" required />
+        </div>
+        <button type="submit" class="btn btn-danger">Book Ambulance</button>
+        <div id="ambulanceBookingMsg" class="mt-2"></div>
+      </form>
+    </div>
+  </div>
+</div>
 <!-- Footer -->
 <footer>
   <p>Contact: 8248917874 | Address: Thanjavur, Tamil Nadu</p>
@@ -406,10 +408,15 @@ function showSection(sectionId) {
   document.getElementById(sectionId).style.display = 'block';
 }
 
-// Auth & Storage
-let patients = JSON.parse(localStorage.getItem('patients')) || [];
-let appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-let doctorAssignments = JSON.parse(localStorage.getItem('doctorAssignments')) || {};
+// Clear existing user data for a fresh start
+localStorage.removeItem('patients');
+localStorage.removeItem('currentPatient');
+sessionStorage.removeItem('currentPatientId');
+
+// Initialize fresh storage
+let patients = [];
+let appointments = [];
+let doctorAssignments = {};
 const RECEPTION_CREDENTIALS = { username: 'admin', password: 'admin123' };
 
 async function handleSignup(e) {
@@ -418,24 +425,58 @@ async function handleSignup(e) {
   signupBtn.disabled = true;
   const oldText = signupBtn.innerHTML;
   signupBtn.innerHTML = `<span class='spinner-border spinner-border-sm'></span> Signing up...`;
+  
   const formData = new FormData(e.target);
-  const email = formData.get('email');
+  const email = formData.get('email').trim();
   const password = formData.get('password');
+  
+  if (!email || !password) {
+    signupBtn.disabled = false;
+    signupBtn.innerHTML = 'Sign Up';
+    alert('Please fill in all required fields');
+    return;
+  }
+  
   try {
-    // TODO: Implement user registration logic with your new backend
-    // This is where you'll handle user registration with your new backend service
-    if (error) {
-      alert(error.message || 'Registration failed.');
-      return;
+    // Get fresh copy of patients from localStorage
+    let patients = JSON.parse(localStorage.getItem('patients') || '[]');
+    
+    // Check if user already exists (case-insensitive check)
+    const existingUser = patients.find(patient => patient.email.toLowerCase() === email.toLowerCase());
+    if (existingUser) {
+      throw new Error('An account with this email already exists. Please login instead.');
     }
-    alert('Registration successful! Please check your email to confirm your account.');
-    showSection('patientAuth');
+    
+    // Create complete user object
+    const newUser = {
+      id: 'patient_' + Date.now().toString(),
+      email: email.toLowerCase(), // Store email in lowercase
+      password, // In a real app, this should be hashed
+      name: '',
+      phone: '',
+      address: '',
+      appointments: [],
+      email_confirmed: true,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Add to patients array and save to localStorage
+    patients.push(newUser);
+    localStorage.setItem('patients', JSON.stringify(patients));
+    
+    // Show success message
+    alert('Registration successful! You can now log in with your credentials.');
+    
+    // Reset form and go to login page
     e.target.reset();
+    showSection('patientAuth');
+    
   } catch (err) {
-    alert(err.message || 'Error during registration.');
+    alert(err.message || 'Error during registration. Please try again.');
+    console.error('Signup error:', err);
   } finally {
     signupBtn.disabled = false;
-    signupBtn.innerHTML = oldText;
+    signupBtn.innerHTML = 'Sign Up';
   }
 }
 function clearReceptionistNotifications() {
@@ -444,37 +485,59 @@ function clearReceptionistNotifications() {
 }
 async function handlePatientLogin(e) {
   e.preventDefault();
-  const email = document.getElementById('loginEmail').value;
+  const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
   const loginBtn = document.getElementById('patientLoginBtn');
   loginBtn.disabled = true;
   const oldText = loginBtn.innerHTML;
   loginBtn.innerHTML = `<span class='spinner-border spinner-border-sm'></span> Logging in...`;
+  
   try {
-    // TODO: Implement login logic with your new backend
-    // This is where you'll handle user authentication with your new backend service
-    if (error) {
-      alert(error.message || 'Login failed.');
-      return;
+    // Get fresh copy of patients from localStorage
+    const patients = JSON.parse(localStorage.getItem('patients') || '[]');
+    
+    // Find user in the patients array
+    const patient = patients.find(p => p.email === email && p.password === password);
+    
+    if (!patient) {
+      throw new Error('Invalid email or password');
     }
-    if (!data.user) {
-      alert('Login failed: User not found.');
-      return;
+    
+    // In demo, we're automatically confirming emails on signup
+    // So we'll just set it to true if it's not set
+    if (patient.email_confirmed === undefined) {
+      patient.email_confirmed = true;
+      // Update the patient record
+      const updatedPatients = patients.map(p => p.id === patient.id ? patient : p);
+      localStorage.setItem('patients', JSON.stringify(updatedPatients));
     }
-    if (!data.user.email_confirmed_at) {
-      alert('Please confirm your email before logging in.');
-      return;
-    }
-    // Login successful and email confirmed
-    // Store minimal patient info in localStorage for compatibility
-    let patientsArr = JSON.parse(localStorage.getItem('patients')) || [];
-    let found = patientsArr.find(p => p.email === data.user.email);
-    let currentPatient = found ? found : { email: data.user.email, profile: {} };
-    localStorage.setItem('currentPatient', JSON.stringify(currentPatient));
+    
+    // Store the logged-in user's data
+    const userData = {
+      id: patient.id,
+      email: patient.email,
+      profile: {
+        name: patient.name || '',
+        phone: patient.phone || '',
+        address: patient.address || ''
+      }
+    };
+    
+    localStorage.setItem('currentPatient', JSON.stringify(userData));
+    sessionStorage.setItem('currentPatientId', patient.id);
+    
+    // Show the patient dashboard
     showSection('patientDashboard');
-    loadProfile(); // Load profile UI
+    
+    // Load the patient's profile and appointments
+    loadProfile();
+    loadPatientAppointments();
+    
+    // Clear the login form
+    e.target.reset();
   } catch (err) {
-    alert(err.message || 'Login failed.');
+    alert(err.message || 'An error occurred during login. Please try again.');
+    console.error('Login error:', err);
   } finally {
     loginBtn.disabled = false;
     loginBtn.innerHTML = oldText;
@@ -503,9 +566,9 @@ function loadProfile() {
         document.getElementById('bloodGroup').value = '';
         document.getElementById('mobile').value = '';
     }
-    // Make fields readonly by default
-    setProfileFieldsReadonly(true);
-    document.getElementById('saveProfileBtn').disabled = true;
+    // Make fields editable by default
+    setProfileFieldsReadonly(false);
+    document.getElementById('saveProfileBtn').disabled = false;
     // Load updated notification from the patient record
     if (patient && patient.notification) {
       const noteDiv = document.getElementById('notification');
@@ -523,24 +586,34 @@ function loadProfile() {
 }
 
 function setProfileFieldsReadonly(readonly) {
-    ['firstName','lastName','age','bloodGroup','mobile'].forEach(id => {
-      document.getElementById(id).readOnly = readonly;
-      document.getElementById(id).disabled = false;
+    const fields = ['firstName', 'lastName', 'age', 'bloodGroup', 'mobile'];
+    fields.forEach(id => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.readOnly = readonly;
+        element.disabled = readonly;
+      }
     });
-    document.getElementById('bloodGroup').disabled = readonly;
+    // Special handling for bloodGroup which is a select element
+    const bloodGroup = document.getElementById('bloodGroup');
+    if (bloodGroup) {
+      bloodGroup.disabled = readonly;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
   const editBtn = document.getElementById('editProfileBtn');
   const saveBtn = document.getElementById('saveProfileBtn');
-  if (editBtn && saveBtn) {
-    editBtn.addEventListener('click', function() {
-      setProfileFieldsReadonly(false);
-      saveBtn.disabled = false;
-    });
-    saveBtn.addEventListener('click', function() {
-      setProfileFieldsReadonly(true);
-      saveBtn.disabled = true;
+  const profileForm = document.querySelector('form[onsubmit="saveProfile(event)"]');
+  
+  if (editBtn && saveBtn && profileForm) {
+    // Make fields editable by default
+    setProfileFieldsReadonly(false);
+    
+    // Handle form submission
+    profileForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      saveProfile(e);
     });
   }
 });
@@ -1387,5 +1460,16 @@ if (feedbackForm) {
 document.addEventListener('DOMContentLoaded', renderFeedbackList);
 </script>
 
+  <div style="margin-bottom: 100px;">
+    <!-- This pushes content up to prevent it from being hidden behind the fixed footer -->
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>Contact: 8248917874 | Address: Thanjavur, Tamil Nadu</p>
+    <p>&copy; 2025 HEALTHPOINT CLINIC. All rights reserved.</p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
